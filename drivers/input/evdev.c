@@ -3,6 +3,7 @@
  * Event char devices, giving access to raw input device events.
  *
  * Copyright (c) 1999-2002 Vojtech Pavlik
+ * Copyright (c) 2023 Benjamin Mordaunt
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -1026,6 +1027,28 @@ static int evdev_get_mask(struct evdev_client *client,
 	return 0;
 }
 
+/** construct a "snapshotted" input_dev_view from an input_dev
+ * See locking notes from evdev_handle_get_val as the same applies here.
+ */
+static int evdev_handle_get_view(struct input_dev *dev,
+				void __user *p)
+{
+	struct input_dev_view __user *idevice = (struct input_dev_view __user *)p;
+	struct input_dev_view view;
+
+	view.id = dev->id;
+
+	if (!test_bit(EV_REP, dev->evbit))
+		view.error = -ENOSYS;
+
+	view.rep[REP_DELAY] = dev->rep[REP_DELAY];
+	view.rep[REP_PERIOD] = dev->rep[REP_PERIOD];
+
+	if (put_user(view, idevice))
+		return -EFAULT;
+	return 0;
+}
+
 static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 			   void __user *p, int compat_mode)
 {
@@ -1040,8 +1063,13 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 	unsigned int size;
 	int error;
 
+	size = _IOC_SIZE(cmd);
+
 	/* First we check for fixed-length commands */
 	switch (cmd) {
+
+	case EVIOCGDEVICEVIEW:
+		return evdev_handle_get_view(dev, p);
 
 	case EVIOCGVERSION:
 		return put_user(EV_VERSION, ip);
@@ -1137,8 +1165,6 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 	case EVIOCSKEYCODE_V2:
 		return evdev_handle_set_keycode_v2(dev, p);
 	}
-
-	size = _IOC_SIZE(cmd);
 
 	/* Now check variable-length commands */
 #define EVIOC_MASK_SIZE(nr)	((nr) & ~(_IOC_SIZEMASK << _IOC_SIZESHIFT))

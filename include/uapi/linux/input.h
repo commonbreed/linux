@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  * Copyright (c) 1999-2002 Vojtech Pavlik
+ * Copyright (c) 2023 Benjamin Mordaunt
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
@@ -129,6 +130,21 @@ struct input_mask {
 	__u64 codes_ptr;
 };
 
+/**
+ * struct input_dev_view - a uapi view to the full-fat struct input_dev
+ * @id: id of the device (struct input_id)
+ * @rep: current values for autorepeat parameters (delay, rate)
+ * 
+ * The structure is used to bundle fields from struct input_dev that were 
+ * accessible via the traditional assortment of IOCTLs. Provides a more pleasant
+ * userspace interface.
+ */
+struct input_dev_view {
+	struct input_id id;
+	int rep[REP_CNT];
+	int error;
+};
+
 #define EVIOCGVERSION		_IOR('E', 0x01, int)			/* get driver version */
 #define EVIOCGID		_IOR('E', 0x02, struct input_id)	/* get device ID */
 #define EVIOCGREP		_IOR('E', 0x03, unsigned int[2])	/* get repeat settings */
@@ -143,6 +159,8 @@ struct input_mask {
 #define EVIOCGPHYS(len)		_IOC(_IOC_READ, 'E', 0x07, len)		/* get physical location */
 #define EVIOCGUNIQ(len)		_IOC(_IOC_READ, 'E', 0x08, len)		/* get unique identifier */
 #define EVIOCGPROP(len)		_IOC(_IOC_READ, 'E', 0x09, len)		/* get device properties */
+
+#define EVIOCGDEVICEVIEW	_IOR('E', 0x0A, struct input_dev_view) /* get a complete struct input_device */
 
 /**
  * EVIOCGMTSLOTS(len) - get MT slot values
